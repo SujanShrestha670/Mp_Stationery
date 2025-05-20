@@ -12,12 +12,14 @@ import {
   getUserDetails,
   updateUser,
   deleteUser,
+  verifyEmail,
 } from "../controllers/authControllers.js";
 import { authorizeRoles, isAuthenticatedUser } from "../middlewares/auth.js";
 
 const router = express.Router();
 
 router.route("/register").post(registerUser);
+router.route("/verify-email").post(verifyEmail);
 router.route("/login").post(loginUser);
 router.route("/logout").get(isAuthenticatedUser, logout);
 router.route("/password/forgot").post(forgotPassword);

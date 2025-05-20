@@ -6,14 +6,36 @@ import sendEmail from "../utils/sendEmail.js";
 
 // Register user => /api/v1/register
 export const registerUser = catchAsyncErrors(async (req, res, next) => {
-  const { name, email, password } = req.body;
+  const { name, email, phone, password } = req.body;
 
-  // Create a new user
-  const user = await User.create({ name, email, password });
+  // Generate a 6-digit verification code
+  const verificationCode = Math.floor(
+    100000 + Math.random() * 900000
+  ).toString();
+  const verificationCodeExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  // Create user with verification code
+  const user = await User.create({
+    name,
+    email,
+    phone,
+    password,
+    verificationCode,
+    verificationCodeExpire,
+    isVerified: false,
+  });
+
+  // Send verification code to user's email
+  await sendEmail({
+    email: user.email,
+    subject: "Verify your email",
+    message: `Your verification code is: ${verificationCode}`,
+  });
 
   res.status(201).json({
     success: true,
-    message: "User registered successfully. Please log in to access resources.",
+    message:
+      "User registered successfully. Please check your email for the verification code.",
   });
 });
 
@@ -208,5 +230,34 @@ export const deleteUser = catchAsyncErrors(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: "User deleted successfully",
+  });
+});
+
+// Verify Email => /api/v1/verify-email
+export const verifyEmail = catchAsyncErrors(async (req, res, next) => {
+  const { email, code } = req.body;
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return next(new ErrorHandler("User not found", 404));
+  }
+
+  if (
+    !user.verificationCode ||
+    user.verificationCode !== code ||
+    user.verificationCodeExpire < Date.now()
+  ) {
+    return next(new ErrorHandler("Invalid or expired verification code", 400));
+  }
+
+  user.isVerified = true;
+  user.verificationCode = undefined;
+  user.verificationCodeExpire = undefined;
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully. You can now log in.",
   });
 });

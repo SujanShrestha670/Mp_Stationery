@@ -1,7 +1,11 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phoneRegex = /^\+977\s?\d{10}$/;
+const passwordRegex =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
 const userSchema = new mongoose.Schema(
   {
@@ -9,17 +13,38 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please enter your name"],
       maxLength: [50, "Your name cannot exceed 50 characters"],
+      validate: {
+        validator: (v) => /^[A-Za-z\s]+$/.test(v),
+        message: "Full Name must only contain letters and spaces",
+      },
     },
     email: {
       type: String,
       required: [true, "Please enter your email"],
       unique: true,
+      validate: {
+        validator: (v) => emailRegex.test(v),
+        message: "Enter a valid email address",
+      },
+    },
+    phone: {
+      type: String,
+      required: [true, "Please enter your phone number"],
+      unique: true,
+      validate: {
+        validator: (v) => phoneRegex.test(v),
+        message: "Enter a valid Nepal phone number starting with +977",
+      },
     },
     password: {
       type: String,
       required: [true, "Please enter your password"],
-      minLength: [6, "Your password must be longer than 6 characters"],
       select: false,
+      validate: {
+        validator: (v) => passwordRegex.test(v),
+        message:
+          "Password must be at least 8 characters, include uppercase, lowercase, number, and special character",
+      },
     },
     avatar: {
       public_id: String,
@@ -31,6 +56,12 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordCode: String,
     resetPasswordExpire: Date,
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationCode: String,
+    verificationCodeExpire: Date,
   },
   { timestamps: true }
 );
@@ -58,13 +89,9 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
 
 // Generate password reset code
 userSchema.methods.getResetPasswordCode = function () {
-  // Generate a 6-digit reset code
   const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-  // Set resetPasswordCode and resetPasswordExpire fields
   this.resetPasswordCode = resetCode;
   this.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutes
-
   return resetCode;
 };
 
